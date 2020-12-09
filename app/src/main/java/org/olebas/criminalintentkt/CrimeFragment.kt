@@ -3,6 +3,7 @@ package org.olebas.criminalintentkt
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.text.format.DateFormat
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -30,7 +31,7 @@ class CrimeFragment : Fragment() {
         solvedCheckBox = view.findViewById(R.id.crime_solved)
 
         dateButton.apply {
-            text = crime.date.toString()
+            text = DateFormat.format("EEE, d MMM yyyy HH:mm", crime.date)
             isEnabled = false
         }
 
