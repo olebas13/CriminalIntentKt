@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.text.format.DateFormat
 import android.util.Log
 import android.view.*
+import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.fragment.app.Fragment
@@ -24,6 +25,8 @@ class CrimeListFragment : Fragment() {
 
     private var callbacks: Callbacks? = null
     private lateinit var crimeRecyclerView: RecyclerView
+    private lateinit var emptyListTextView: TextView
+    private lateinit var newCrimeButton: Button
     private var adapter: CrimeAdapter? = CrimeAdapter()
 
     private val crimeListViewModel: CrimeListViewModel by lazy {
@@ -43,8 +46,16 @@ class CrimeListFragment : Fragment() {
         val view = inflater.inflate(R.layout.fragment_crime_list, container, false)
 
         crimeRecyclerView = view.findViewById(R.id.crime_recycler_view) as RecyclerView
+        emptyListTextView = view.findViewById(R.id.no_crimes) as TextView
+        newCrimeButton = view.findViewById(R.id.add_new_crime) as Button
         crimeRecyclerView.layoutManager = LinearLayoutManager(context)
         crimeRecyclerView.adapter = adapter
+
+        newCrimeButton.setOnClickListener {
+            val crime = Crime()
+            crimeListViewModel.addCrime(crime)
+            callbacks?.onCrimeSelected(crime.id)
+        }
 
         return view
     }
@@ -53,8 +64,18 @@ class CrimeListFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         crimeListViewModel.crimeListLiveData.observe(
             viewLifecycleOwner, Observer { crimes ->
-                crimes?.let {
-                    Log.i(TAG, "Got crimes ${crimes.size}")
+//                crimes?.let {
+//                    Log.i(TAG, "Got crimes ${crimes.size}")
+//                    adapter?.submitList(crimes)
+//                }
+                if (crimes.size == 0) {
+                    crimeRecyclerView.visibility = View.GONE
+                    emptyListTextView.visibility = View.VISIBLE
+                    newCrimeButton.visibility = View.VISIBLE
+                } else {
+                    crimeRecyclerView.visibility = View.VISIBLE
+                    emptyListTextView.visibility = View.GONE
+                    newCrimeButton.visibility = View.GONE
                     adapter?.submitList(crimes)
                 }
             }
