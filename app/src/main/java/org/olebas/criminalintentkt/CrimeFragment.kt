@@ -201,9 +201,9 @@ class CrimeFragment : Fragment(), DatePickerFragment.Callbacks, TimePickerFragme
 
                         Log.d(TAG, "$numbers $id $hasNumber")
 
-                        numbers?.use {
-                            it.moveToFirst()
-                            val phone = it.getString(it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER))
+                        numbers?.use { number ->
+                            number.moveToFirst()
+                            val phone = number.getString(number.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER))
                             crime.phone = phone
                         }
                     } else {
