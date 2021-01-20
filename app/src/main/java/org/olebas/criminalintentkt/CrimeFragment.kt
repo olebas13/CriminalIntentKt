@@ -1,5 +1,6 @@
 package org.olebas.criminalintentkt
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -10,17 +11,19 @@ import android.provider.ContactsContract
 import android.text.Editable
 import android.text.TextWatcher
 import android.text.format.DateFormat
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
-import java.sql.Time
-import java.text.SimpleDateFormat
+
 import java.util.*
 
 class CrimeFragment : Fragment(), DatePickerFragment.Callbacks, TimePickerFragment.Callbacks {
@@ -32,6 +35,9 @@ class CrimeFragment : Fragment(), DatePickerFragment.Callbacks, TimePickerFragme
     private lateinit var solvedCheckBox: CheckBox
     private lateinit var reportButton: Button
     private lateinit var suspectButton: Button
+    private lateinit var callSuspectButton: Button
+
+    private var phoneAccess = false
 
     private val crimeDetailViewModel: CrimeDetailViewModel by lazy {
         ViewModelProvider(this).get(CrimeDetailViewModel::class.java)
@@ -52,6 +58,7 @@ class CrimeFragment : Fragment(), DatePickerFragment.Callbacks, TimePickerFragme
         solvedCheckBox = view.findViewById(R.id.crime_solved)
         reportButton = view.findViewById(R.id.crime_report)
         suspectButton = view.findViewById(R.id.crime_suspect)
+        callSuspectButton = view.findViewById(R.id.call_suspect)
 
         return view
     }
@@ -64,6 +71,15 @@ class CrimeFragment : Fragment(), DatePickerFragment.Callbacks, TimePickerFragme
                 updateUI()
             }
         })
+
+        if (ContextCompat.checkSelfPermission(activity!!.applicationContext,
+                Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(activity!!, arrayOf(Manifest.permission.READ_CONTACTS),
+                MY_PERMISSIONS_REQUEST_READ_CONTACTS)
+        } else {
+            phoneAccess = true
+            callSuspectButton.isEnabled = true
+        }
     }
 
     override fun onStart() {
@@ -132,6 +148,15 @@ class CrimeFragment : Fragment(), DatePickerFragment.Callbacks, TimePickerFragme
             }
         }
 
+        callSuspectButton.setOnClickListener {
+            val callIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${crime.phone}"))
+            startActivity(callIntent)
+        }
+
+        if (!phoneAccess) {
+            callSuspectButton.isEnabled = false
+        }
+
     }
 
     override fun onStop() {
@@ -144,22 +169,66 @@ class CrimeFragment : Fragment(), DatePickerFragment.Callbacks, TimePickerFragme
             resultCode != Activity.RESULT_OK -> return
 
             requestCode == REQUEST_CONTACT && data != null -> {
-                val contactUri: Uri = data.data!!
+                val contactUri: Uri? = data.data
 
-                val queryFields = arrayOf(ContactsContract.Contacts.DISPLAY_NAME)
-                val cursor = requireActivity().contentResolver.query(contactUri, queryFields,
+                val queryFields = arrayOf(
+                    ContactsContract.Contacts.DISPLAY_NAME,
+                    ContactsContract.Contacts._ID,
+                    ContactsContract.Contacts.HAS_PHONE_NUMBER
+                )
+
+                val contentResolver = requireActivity().contentResolver
+                val contacts = contentResolver.query(contactUri!!, queryFields,
                     null, null, null)
-                cursor?.use { cursor ->
-                    if (cursor.count == 0) {
+                contacts?.use {
+                    if (it.count == 0) {
                         return
                     }
 
-                    cursor.moveToFirst()
-                    val suspect = cursor.getString(0)
+                    it.moveToFirst()
+                    val suspect = it.getString(it.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME))
+                    val id = it.getString(it.getColumnIndex(ContactsContract.Contacts._ID))
+                    val hasNumber = it.getString(it.getColumnIndex(
+                        ContactsContract.Contacts.HAS_PHONE_NUMBER)).toInt()
+
+                    if (hasNumber >= 1 && phoneAccess) {
+                        val numbers = contentResolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                            null,
+                            ContactsContract.CommonDataKinds.Phone.CONTACT_ID + "=" + id,
+                            null,
+                            null
+                        )
+
+                        Log.d(TAG, "$numbers $id $hasNumber")
+
+                        numbers?.use {
+                            it.moveToFirst()
+                            val phone = it.getString(it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER))
+                            crime.phone = phone
+                        }
+                    } else {
+                        crime.phone = ""
+                    }
+
                     crime.suspect = suspect
                     crimeDetailViewModel.saveCrime(crime)
                     suspectButton.text = suspect
                 }
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        when (requestCode) {
+            MY_PERMISSIONS_REQUEST_READ_CONTACTS -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    phoneAccess = true
+                }
+                return
             }
         }
     }
@@ -187,6 +256,8 @@ class CrimeFragment : Fragment(), DatePickerFragment.Callbacks, TimePickerFragme
         if (crime.suspect.isNotEmpty()) {
             suspectButton.text = crime.suspect
         }
+
+        callSuspectButton.isEnabled = crime.phone.isNotEmpty()
     }
 
     private fun getCrimeReport(): String {
@@ -215,6 +286,7 @@ class CrimeFragment : Fragment(), DatePickerFragment.Callbacks, TimePickerFragme
         private const val REQUEST_DATE = 0
         private const val REQUEST_TIME = 1
         private const val REQUEST_CONTACT = 2
+        private const val MY_PERMISSIONS_REQUEST_READ_CONTACTS = 4
         private const val DATE_FORMAT = "EEE, d MMM yyyy"
         private const val TIME_FORMAT = "HH:mm"
 
