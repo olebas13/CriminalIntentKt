@@ -2,6 +2,7 @@ package org.olebas.criminalintentkt
 
 import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
@@ -193,6 +194,12 @@ class CrimeFragment : Fragment(), DatePickerFragment.Callbacks, TimePickerFragme
             }
         }
 
+        photoView.setOnClickListener {
+           CrimePhotoZoomFragment.newInstance(photoFile).apply {
+               show(this@CrimeFragment.parentFragmentManager, DIALOG_PHOTO)
+           }
+        }
+
     }
 
     override fun onStop() {
@@ -340,6 +347,7 @@ class CrimeFragment : Fragment(), DatePickerFragment.Callbacks, TimePickerFragme
         private const val TAG = "CrimeFragment"
         private const val DIALOG_DATE = "DialogDate"
         private const val DIALOG_TIME = "DialogTime"
+        private const val DIALOG_PHOTO = "DialogPhoto"
         private const val REQUEST_DATE = 0
         private const val REQUEST_TIME = 1
         private const val REQUEST_CONTACT = 2
